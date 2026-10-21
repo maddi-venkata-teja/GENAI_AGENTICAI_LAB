@@ -1,0 +1,782 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Smart Home Climate Agent</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+/* Layout: one working console. Room + controls on top, trend chart and audit log below. */
+:root{
+  --bg:#edf1ef; --surface:#fafcfb; --surface-2:#e2e9e6; --line:#ccd6d2;
+  --fg:#142320; --muted:#566964;
+  --accent:#0e6f63; --accent-fg:#ffffff;
+  --cool:#1d6bbd; --heat:#c24f14; --ok:#1b7a4e; --warn:#96660a; --bad:#b8342b;
+  --wall:#dde6e2; --floor:#c3cfca; --furn:#9db1aa; --furn-dark:#7f948c; --frame:#6f847c;
+  --sky-sunny:#9fd2f2; --sky-rain:#8fa3b0; --sky-heat:#f5b46a; --sun:#ffd25a; --cloud:#e8eef1;
+  --font-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --font-body:'Instrument Sans','Segoe UI',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1412; --surface:#151e1b; --surface-2:#1e2a26; --line:#2b3a35;
+    --fg:#e3ebe8; --muted:#90a49d;
+    --accent:#45c4ad; --accent-fg:#06201b;
+    --cool:#6ab0f5; --heat:#f59a66; --ok:#52c98e; --warn:#e6bc4f; --bad:#f2756b;
+    --wall:#1b2723; --floor:#121b18; --furn:#3b4d47; --furn-dark:#2c3b36; --frame:#3f514b;
+    --sky-sunny:#2d5a82; --sky-rain:#2a3945; --sky-heat:#8a4a1e; --sun:#ffd25a; --cloud:#5b6c78;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1412; --surface:#151e1b; --surface-2:#1e2a26; --line:#2b3a35;
+  --fg:#e3ebe8; --muted:#90a49d;
+  --accent:#45c4ad; --accent-fg:#06201b;
+  --cool:#6ab0f5; --heat:#f59a66; --ok:#52c98e; --warn:#e6bc4f; --bad:#f2756b;
+  --wall:#1b2723; --floor:#121b18; --furn:#3b4d47; --furn-dark:#2c3b36; --frame:#3f514b;
+  --sky-sunny:#2d5a82; --sky-rain:#2a3945; --sky-heat:#8a4a1e; --sun:#ffd25a; --cloud:#5b6c78;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1280px;margin-left:auto;margin-right:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.f-display{font-family:var(--font-display)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,4vw,34px);line-height:1.1;letter-spacing:-.01em;text-wrap:balance}
+h2{font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.005em;text-wrap:balance}
+.eyebrow{font:600 11px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sub{color:var(--muted);max-width:60ch;margin-top:6px}
+.muted-sm{color:var(--muted);font-size:12px}
+.lbl{font-weight:500;font-size:13px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.tile{background:var(--surface-2);border-radius:10px;padding:12px 14px;min-width:0}
+.tile .eyebrow{display:block;margin-bottom:4px}
+.big{font-family:var(--font-display);font-weight:700;font-size:46px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.big small{font-size:20px;font-weight:500;color:var(--muted);margin-left:2px}
+.med{font-family:var(--font-display);font-weight:700;font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.med small{font-size:15px;font-weight:500;color:var(--muted);margin-left:2px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:600 12px var(--font-body);letter-spacing:.02em;white-space:nowrap;background:var(--surface-2);color:var(--fg)}
+.chip i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.chip.cool{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool)}
+.chip.heat{background:color-mix(in srgb,var(--heat) 16%,transparent);color:var(--heat)}
+.chip.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.chip.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.chip.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.chip.idle{background:var(--surface-2);color:var(--muted)}
+.chip.hold{background:transparent;box-shadow:inset 0 0 0 1px currentColor;font-weight:500}
+.chip.lg{font-size:14px;padding:5px 14px}
+
+/* buttons */
+button{font-family:var(--font-body);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 14px;font-weight:600;font-size:13px;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:9px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:5px 12px;border-radius:7px;font-weight:600;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px color-mix(in srgb,var(--fg) 18%,transparent)}
+.wxbtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.wxbtns button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);transition:border-color .15s,background .15s}
+.wxbtns button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-bottom:4px}
+.wxbtns button span{font-weight:600;font-size:13px}
+.wxbtns button small{color:var(--muted);font:400 11px var(--font-mono)}
+.wxbtns button:hover{background:var(--surface-2)}
+.wxbtns button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--accent)}
+.wxbtns button[data-wx="sunny"] svg{color:var(--warn)}
+.wxbtns button[data-wx="rainy"] svg{color:var(--cool)}
+.wxbtns button[data-wx="heatwave"] svg{color:var(--heat)}
+.switch{position:relative;width:40px;height:22px;border-radius:999px;border:0;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line);flex:none;transition:background .2s}
+.switch span{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.switch[aria-checked="true"]{background:var(--accent);box-shadow:none}
+.switch[aria-checked="true"] span{transform:translateX(18px);background:var(--accent-fg)}
+
+/* room scene */
+.scene{border-radius:10px;overflow:hidden;background:var(--wall)}
+.scene svg{display:block;width:100%;height:auto}
+.scene-num{font:700 15px var(--font-mono);fill:var(--fg)}
+.g-sunny,.g-rainy,.g-heatwave{display:none}
+.scene[data-wx="sunny"] .g-sunny,.scene[data-wx="rainy"] .g-rainy,.scene[data-wx="heatwave"] .g-heatwave{display:inline}
+.tint{fill:transparent;transition:fill .8s;pointer-events:none}
+.scene[data-dev="AC"] .tint{fill:color-mix(in srgb,var(--cool) 15%,transparent)}
+.scene[data-dev="HEATER"] .tint{fill:color-mix(in srgb,var(--heat) 15%,transparent)}
+.acflow,.heatwaves{display:none}
+.scene[data-dev="AC"] .acflow{display:inline}
+.scene[data-dev="HEATER"] .heatwaves{display:inline}
+.heatglow{opacity:0;transition:opacity .6s;fill:var(--heat)}
+.scene[data-dev="HEATER"] .heatglow{opacity:.85}
+.led{fill:var(--furn-dark);transition:fill .3s}
+.scene[data-dev="AC"] .led{fill:var(--cool)}
+.acflow path{stroke-dasharray:7 7;animation:flow 1s linear infinite}
+.heatwaves path{stroke-dasharray:6 6;animation:flow 1.2s linear infinite}
+.raindrops line{animation:rain .9s linear infinite}
+.shimmer path{animation:sway 2.4s ease-in-out infinite}
+@keyframes flow{to{stroke-dashoffset:-28}}
+@keyframes rain{from{transform:translateY(-14px)}to{transform:translateY(20px)}}
+@keyframes sway{0%,100%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
+
+/* gauges */
+.gauge{position:relative;height:12px;border-radius:999px;background:var(--surface-2)}
+.gauge .band{position:absolute;top:0;bottom:0;border-radius:999px;background:color-mix(in srgb,var(--ok) 35%,transparent);box-shadow:inset 0 0 0 1px var(--ok)}
+.gauge .mark{position:absolute;top:-4px;width:6px;height:20px;border-radius:3px;background:var(--fg);transform:translateX(-50%);transition:left .6s ease}
+.gauge-scale{position:relative;height:18px;margin-top:6px;font:400 11px var(--font-mono);color:var(--muted)}
+.gauge-scale span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.hum .band{background:color-mix(in srgb,var(--cool) 28%,transparent);box-shadow:inset 0 0 0 1px var(--cool)}
+input[type=range]{width:100%;accent-color:var(--accent);margin-top:6px}
+
+/* agent loop */
+.stage{position:relative;padding-left:20px;padding-bottom:16px}
+.stage:last-child{padding-bottom:0}
+.stage::before{content:"";position:absolute;left:4px;top:18px;bottom:0;width:1px;background:var(--line)}
+.stage:last-child::before{display:none}
+.stage::after{content:"";position:absolute;left:0;top:4px;width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin-top:6px}
+.kv div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding-bottom:3px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+table{border-collapse:collapse;width:100%}
+.cands{margin-top:6px;font-size:12.5px}
+.cands th{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 6px}
+.cands td{padding:5px 6px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.cands td:first-child{font-family:var(--font-body);font-weight:500}
+.cands th:last-child,.cands td:last-child{text-align:right}
+.cands tr.best td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.cands tr.best td:first-child{border-radius:6px 0 0 6px;font-weight:600}
+.cands tr.best td:last-child{border-radius:0 6px 6px 0}
+.reason{margin-top:8px;font-size:13.5px;line-height:1.45}
+
+/* chart + log */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px;color:var(--muted)}
+.legend .sw{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.legend label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.legend input{accent-color:var(--accent);margin:0}
+#chartBox{position:relative;width:100%}
+#chartBox svg{display:block}
+.ax{font:500 11px var(--font-mono);fill:var(--muted)}
+.axl{font:500 11px var(--font-mono);fill:var(--ok)}
+.tip{position:absolute;top:6px;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:12px var(--font-mono);line-height:1.5;white-space:nowrap;box-shadow:0 4px 14px color-mix(in srgb,var(--fg) 14%,transparent);transform:translateX(-50%)}
+.logwrap{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.log{min-width:760px;font-size:13px}
+.log thead th{position:sticky;top:0;background:var(--surface-2);font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 12px;z-index:1}
+.log td{padding:8px 12px;vertical-align:top;border-top:1px solid var(--line)}
+.log td.m{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px}
+.log tr.chg td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.log tr.ev td{background:var(--surface-2);color:var(--muted);font-size:12.5px}
+.log .px{color:var(--muted)}
+
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="flex flex-wrap items-end justify-between gap-4 mb-5">
+    <div class="min-w-0">
+      <p class="eyebrow">Goal-based agent</p>
+      <h1>Smart Home Climate Agent</h1>
+      <p class="sub">Keeps the living room between your lowest and highest comfortable temperature by sensing the room, predicting what each option does and switching the AC or heater every tick.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="chip ok" id="runChip"><i></i><span id="runTxt">Agent running</span></span>
+      <span class="chip mono" id="clockChip">Tick 0 · 08:00</span>
+    </div>
+  </header>
+
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <!-- ROOM -->
+    <section class="card lg:col-span-7" aria-labelledby="roomH">
+      <div class="card-head">
+        <h2 id="roomH">Living room</h2>
+        <span class="chip ok" id="goalChip"><i></i><span id="goalTxt">In goal</span></span>
+      </div>
+
+      <div class="scene" id="scene" data-wx="rainy" data-dev="IDLE">
+        <svg viewBox="0 0 560 300" role="img" aria-label="Living room with a window showing the weather, a wall AC unit, a floor heater and a thermostat">
+          <defs><clipPath id="winclip"><rect x="46" y="44" width="164" height="126" rx="3"/></clipPath></defs>
+          <rect width="560" height="300" fill="var(--wall)"/>
+          <rect y="236" width="560" height="64" fill="var(--floor)"/>
+          <rect y="231" width="560" height="6" fill="var(--furn-dark)"/>
+
+          <g clip-path="url(#winclip)">
+            <g class="g-sunny">
+              <rect x="46" y="44" width="164" height="126" fill="var(--sky-sunny)"/>
+              <circle cx="160" cy="84" r="36" fill="var(--sun)" opacity=".28"/>
+              <circle cx="160" cy="84" r="22" fill="var(--sun)"/>
+            </g>
+            <g class="g-rainy">
+              <rect x="46" y="44" width="164" height="126" fill="var(--sky-rain)"/>
+              <ellipse cx="98" cy="78" rx="38" ry="16" fill="var(--cloud)"/>
+              <ellipse cx="136" cy="70" rx="32" ry="19" fill="var(--cloud)"/>
+              <ellipse cx="172" cy="80" rx="34" ry="15" fill="var(--cloud)"/>
+              <g class="raindrops" stroke="var(--cool)" stroke-width="2" stroke-linecap="round">
+                <line x1="70" y1="104" x2="66" y2="116" style="animation-delay:-.1s"/>
+                <line x1="92" y1="112" x2="88" y2="124" style="animation-delay:-.5s"/>
+                <line x1="114" y1="104" x2="110" y2="116" style="animation-delay:-.3s"/>
+                <line x1="136" y1="114" x2="132" y2="126" style="animation-delay:-.7s"/>
+                <line x1="158" y1="104" x2="154" y2="116" style="animation-delay:-.2s"/>
+                <line x1="180" y1="112" x2="176" y2="124" style="animation-delay:-.6s"/>
+                <line x1="198" y1="104" x2="194" y2="116" style="animation-delay:-.4s"/>
+              </g>
+            </g>
+            <g class="g-heatwave">
+              <rect x="46" y="44" width="164" height="126" fill="var(--sky-heat)"/>
+              <circle cx="128" cy="100" r="50" fill="var(--sun)" opacity=".3"/>
+              <circle cx="128" cy="100" r="34" fill="var(--sun)"/>
+              <g class="shimmer" fill="none" stroke="var(--heat)" stroke-width="2.5" stroke-linecap="round" opacity=".7">
+                <path d="M56 140q12-7 24 0t24 0t24 0t24 0t24 0t24 0"/>
+                <path d="M56 154q12-7 24 0t24 0t24 0t24 0t24 0t24 0" style="animation-delay:-1.2s"/>
+              </g>
+            </g>
+          </g>
+          <rect x="46" y="44" width="164" height="126" rx="3" fill="none" stroke="var(--frame)" stroke-width="6"/>
+          <path d="M128 44V170M46 107H210" stroke="var(--frame)" stroke-width="4"/>
+
+          <circle cx="272" cy="118" r="28" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+          <text id="sceneTemp" x="272" y="123" text-anchor="middle" class="scene-num">23.4°</text>
+
+          <rect x="334" y="40" width="190" height="50" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+          <path d="M348 74H510M348 81H510" stroke="var(--line)" stroke-width="2"/>
+          <circle class="led" cx="508" cy="54" r="4.5"/>
+          <g class="acflow" fill="none" stroke="var(--cool)" stroke-width="3" stroke-linecap="round" opacity=".8">
+            <path d="M372 96c-8 14 8 28 0 42s8 28 0 42"/>
+            <path d="M430 96c-8 14 8 28 0 42s8 28 0 42"/>
+            <path d="M488 96c-8 14 8 28 0 42s8 28 0 42"/>
+          </g>
+
+          <rect x="54" y="204" width="148" height="27" rx="4" fill="var(--furn)"/>
+          <rect class="heatglow" x="58" y="208" width="140" height="19" rx="3"/>
+          <path d="M70 208v19M82 208v19M94 208v19M106 208v19M118 208v19M130 208v19M142 208v19M154 208v19M166 208v19M178 208v19M190 208v19" stroke="var(--furn-dark)" stroke-width="2"/>
+          <g class="heatwaves" fill="none" stroke="var(--heat)" stroke-width="3" stroke-linecap="round">
+            <path d="M84 198c-7-7 7-13 0-21"/>
+            <path d="M128 198c-7-7 7-13 0-21"/>
+            <path d="M172 198c-7-7 7-13 0-21"/>
+          </g>
+
+          <rect x="340" y="176" width="176" height="60" rx="10" fill="var(--furn)"/>
+          <rect x="326" y="196" width="26" height="44" rx="9" fill="var(--furn-dark)"/>
+          <rect x="504" y="196" width="26" height="44" rx="9" fill="var(--furn-dark)"/>
+          <rect x="348" y="206" width="160" height="32" rx="6" fill="var(--furn-dark)"/>
+          <path d="M246 236h30l-3 24h-24z" fill="var(--furn-dark)"/>
+          <ellipse cx="253" cy="222" rx="9" ry="16" fill="var(--ok)" transform="rotate(-20 253 222)"/>
+          <ellipse cx="269" cy="222" rx="9" ry="16" fill="var(--ok)" transform="rotate(20 269 222)"/>
+          <ellipse cx="261" cy="216" rx="8" ry="17" fill="var(--ok)"/>
+
+          <rect class="tint" width="560" height="300"/>
+        </svg>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+        <div class="tile">
+          <span class="eyebrow">Temperature</span>
+          <div class="big"><span id="tTemp">23.4</span><small>°C</small></div>
+          <div class="muted-sm mono mt-1" id="tTrend">steady</div>
+        </div>
+        <div class="tile">
+          <span class="eyebrow">Humidity</span>
+          <div class="big"><span id="tHum">52</span><small>%</small></div>
+          <div class="mt-1"><span class="chip ok" id="humChip"><i></i><span id="humTxt">Comfortable</span></span></div>
+        </div>
+        <div class="tile col-span-2 sm:col-span-1">
+          <span class="eyebrow">Device</span>
+          <div class="mt-1"><span class="chip lg idle" id="devChip"><i></i><span id="devTxt">Idle</span></span></div>
+          <div class="muted-sm mt-2" id="devSub">AC off · heater off</div>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <div class="flex justify-between items-baseline gap-2 mb-2">
+          <span class="eyebrow">Room temperature against goal</span>
+          <span class="mono muted-sm" id="gaugeNote">Goal 20.0–26.0°C</span>
+        </div>
+        <div class="gauge" id="gauge" role="img" aria-label="Temperature gauge"><div class="band" id="gBand"></div><div class="mark" id="gMark"></div></div>
+        <div class="gauge-scale" id="gScale"></div>
+      </div>
+
+      <div class="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+          <div class="flex justify-between items-baseline"><label for="gMin" class="lbl">Goal floor</label><output id="gMinOut" class="mono" for="gMin">20.0°C</output></div>
+          <input id="gMin" type="range" min="16" max="30" step="0.5" value="20">
+        </div>
+        <div>
+          <div class="flex justify-between items-baseline"><label for="gMax" class="lbl">Goal ceiling</label><output id="gMaxOut" class="mono" for="gMax">26.0°C</output></div>
+          <input id="gMax" type="range" min="18" max="32" step="0.5" value="26">
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN -->
+    <div class="lg:col-span-5 flex flex-col gap-4 min-w-0">
+      <section class="card" aria-labelledby="simH">
+        <div class="card-head">
+          <h2 id="simH">Weather simulator</h2>
+          <span class="muted-sm" id="autoNext">Auto weather on</span>
+        </div>
+        <div class="wxbtns" id="wxBtns" role="group" aria-label="Outside weather">
+          <button type="button" data-wx="sunny" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.5"/><path d="M10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18M4.3 4.3l1.8 1.8M13.9 13.9l1.8 1.8M4.3 15.7l1.8-1.8M13.9 6.1l1.8-1.8"/></svg>
+            <span>Sunny</span><small>~29°C · 45%</small>
+          </button>
+          <button type="button" data-wx="rainy" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 12a3.5 3.5 0 0 1 .4-6.97A4.5 4.5 0 0 1 15 6.7 3 3 0 0 1 14.5 12H6z"/><path d="M7 14.5l-.8 2M10.5 14.5l-.8 2M14 14.5l-.8 2"/></svg>
+            <span>Rainy</span><small>~15°C · 88%</small>
+          </button>
+          <button type="button" data-wx="heatwave" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 11V4a1.5 1.5 0 0 1 3 0v7a3 3 0 1 1-3 0z"/><path d="M10 8v6"/><path d="M15 5c1 1-1 2 0 3M17.5 5c1 1-1 2 0 3"/></svg>
+            <span>Heatwave</span><small>~40°C · 22%</small>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3 mt-4">
+          <button type="button" id="autoSw" class="switch" role="switch" aria-checked="true" aria-labelledby="autoLbl"><span></span></button>
+          <label id="autoLbl" for="autoSw" class="lbl">Change the weather automatically</label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div class="tile"><span class="eyebrow">Outdoor temperature</span><div class="med"><span id="oTemp">16.0</span><small>°C</small></div></div>
+          <div class="tile"><span class="eyebrow">Outdoor humidity</span><div class="med"><span id="oHum">85</span><small>%</small></div></div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 mt-4">
+          <button type="button" class="btn primary" id="runBtn">Pause</button>
+          <button type="button" class="btn" id="stepBtn">Step</button>
+          <button type="button" class="btn" id="resetBtn">Reset</button>
+          <div class="seg ml-auto" id="speedBtns" role="group" aria-label="Simulation speed">
+            <button type="button" data-speed="1" aria-pressed="true">1×</button>
+            <button type="button" data-speed="2" aria-pressed="false">2×</button>
+            <button type="button" data-speed="4" aria-pressed="false">4×</button>
+          </div>
+        </div>
+        <p class="muted-sm mt-3">One tick is five simulated minutes. Picking a weather yourself turns automatic changes off.</p>
+      </section>
+
+      <section class="card" aria-labelledby="agentH">
+        <div class="card-head">
+          <h2 id="agentH">Agent loop</h2>
+          <span class="muted-sm mono" id="agentTick">Tick 0</span>
+        </div>
+        <div class="stage">
+          <span class="eyebrow">Perceive</span>
+          <dl class="kv" id="perceive"></dl>
+        </div>
+        <div class="stage">
+          <span class="eyebrow">Deliberate: predicted room temperature in 4 ticks</span>
+          <table class="cands"><thead><tr><th>Option</th><th>Result</th><th>Goal fit</th><th>Cost</th></tr></thead><tbody id="cands"></tbody></table>
+          <p class="muted-sm mt-2">Cost = 12 × worst miss + distance from goal midpoint + energy + switching. The lowest cost wins.</p>
+        </div>
+        <div class="stage">
+          <span class="eyebrow">Act</span>
+          <div class="mt-2 flex items-center gap-2 flex-wrap"><span class="chip lg idle" id="actChip"><i></i><span id="actTxt">IDLE</span></span></div>
+          <p class="reason" id="reason"></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- CHART -->
+    <section class="card lg:col-span-12" aria-labelledby="chartH">
+      <div class="card-head">
+        <div>
+          <h2 id="chartH">Temperature trend</h2>
+          <p class="muted-sm mono mt-1" id="chartStats"></p>
+        </div>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--accent)"></span>Indoor</span>
+          <span><span class="sw" style="background:color-mix(in srgb,var(--ok) 45%,transparent);height:10px"></span>Goal range</span>
+          <span><span class="sw" style="background:var(--cool);height:8px"></span>AC on</span>
+          <span><span class="sw" style="background:var(--heat);height:8px"></span>Heater on</span>
+          <label for="outToggle"><input type="checkbox" id="outToggle"> Show outdoor</label>
+        </div>
+      </div>
+      <div id="chartBox"><div id="chartSvg"></div><div class="tip" id="tip" hidden></div></div>
+    </section>
+
+    <!-- LOG -->
+    <section class="card lg:col-span-12" aria-labelledby="logH">
+      <div class="card-head">
+        <div>
+          <h2 id="logH">Agent audit log</h2>
+          <p class="muted-sm mt-1" id="logCount"></p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="seg" id="logFilter" role="group" aria-label="Log filter">
+            <button type="button" data-f="all" aria-pressed="true">Every tick</button>
+            <button type="button" data-f="changes" aria-pressed="false">Changes only</button>
+          </div>
+          <button type="button" class="btn" id="clearLog">Clear log</button>
+        </div>
+      </div>
+      <div class="logwrap">
+        <table class="log">
+          <thead><tr><th style="width:64px">Tick</th><th style="width:70px">Time</th><th style="width:27%">Perception</th><th>Deliberation</th><th style="width:150px">Actuation</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ===== CORE START (simulation + agent; no DOM) =====
+const CFG = { K: 0.025, AC: -0.75, HEAT: 0.6, H: 4, MPT: 5 };
+const WX = {
+  sunny:    { label: 'Sunny',    temp: 29, hum: 45, solar: 0.04 },
+  rainy:    { label: 'Rainy',    temp: 15, hum: 88, solar: 0 },
+  heatwave: { label: 'Heatwave', temp: 40, hum: 22, solar: 0.10 }
+};
+const ORDER = ['rainy', 'sunny', 'heatwave'];
+let rand = Math.random;
+const noise = s => (rand() + rand() + rand() - 1.5) * s;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function newState() {
+  return { tick: 0, T: 21.1, H: 55, out: 16.5, outH: 85, wx: 'rainy', auto: true, autoLeft: 14,
+           device: 'IDLE', since: 0, goal: { min: 20, max: 26 }, running: true, speed: 1, clockMin: 8 * 60 };
+}
+
+function nextWeather(wx) { return ORDER[(ORDER.indexOf(wx) + 1) % ORDER.length]; }
+
+function physics(s) {
+  const w = WX[s.wx];
+  s.out  += (w.temp - s.out) * 0.15 + noise(0.12);
+  s.outH += (w.hum - s.outH) * 0.15 + noise(0.6);
+  let dT = CFG.K * (s.out - s.T) + w.solar;
+  let dH = 0.03 * (s.outH - s.H);
+  if (s.device === 'AC')     { dT += CFG.AC;   dH -= 0.9; }
+  if (s.device === 'HEATER') { dT += CFG.HEAT; dH -= 0.25; }
+  s.T += dT + noise(0.05);
+  s.H = clamp(s.H + dH + noise(0.3), 15, 95);
+  s.clockMin += CFG.MPT;
+}
+
+// The agent's own model of the room: where does temperature go if it holds an action for n ticks?
+function rollout(T, out, solar, action, n) {
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    let d = CFG.K * (out - T) + solar;
+    if (action === 'AC') d += CFG.AC;
+    if (action === 'HEATER') d += CFG.HEAT;
+    T += d; arr.push(T);
+  }
+  return arr;
+}
+
+const f1 = v => v.toFixed(1);
+const deg = v => f1(v) + '°C';
+
+function deliberate(p) {
+  const { T, out, solar, goal, device } = p;
+  const mid = (goal.min + goal.max) / 2, half = (goal.max - goal.min) / 2;
+  const evalAction = a => {
+    const traj = rollout(T, out, solar, a, CFG.H);
+    const over = Math.max(0, ...traj.map(t => t - goal.max));
+    const under = Math.max(0, ...traj.map(t => goal.min - t));
+    const miss = Math.max(over, under);
+    const end = traj[traj.length - 1];
+    const cost = 12 * miss + Math.abs(end - mid) / half + (a === 'IDLE' ? 0 : 0.3) + (a === device ? 0 : 0.6);
+    return { action: a, end, miss, side: under > over ? 'under' : 'over', cost };
+  };
+  const pick = ['IDLE', 'AC', 'HEATER'].map(evalAction);          // idle first, so ties favour doing nothing
+  const best = pick.reduce((b, c) => (c.cost < b.cost - 1e-9 ? c : b));
+  const cands = ['AC', 'HEATER', 'IDLE'].map(a => pick.find(c => c.action === a));
+  const idle = pick[0];
+  const status = T > goal.max ? 'above' : T < goal.min ? 'below' : 'inside';
+  const gap = status === 'above' ? T - goal.max : status === 'below' ? goal.min - T : 0;
+  const verb = best.action === 'AC' ? 'cooling' : 'heating';
+  let short;
+  if (best.action === 'IDLE') {
+    if (device !== 'IDLE') short = (device === 'AC' ? 'Cooling' : 'Heating') + ' has reached a safe zone. Coasting is predicted to stay inside the goal (' + deg(idle.end) + ' in ' + CFG.H + ' ticks).';
+    else if (status === 'inside') short = 'Inside the goal and no breach is predicted (' + deg(idle.end) + ' in ' + CFG.H + ' ticks). No action needed.';
+    else short = deg(T) + ' is ' + deg(gap) + ' ' + status + ' the goal, and neither device improves on waiting.';
+  } else if (status !== 'inside') {
+    short = deg(T) + ' is ' + deg(gap) + ' ' + status + ' the goal. ' + verb[0].toUpperCase() + verb.slice(1) + ' brings it to ' + deg(best.end) + ' in ' + CFG.H + ' ticks.';
+  } else if (idle.miss > 0) {
+    short = 'Doing nothing would drift to ' + deg(idle.end) + ' in ' + CFG.H + ' ticks, outside the goal. Starting ' + verb + ' early.';
+  } else {
+    short = 'Still ' + verb + ': stopping now would leave ' + deg(idle.end) + ' in ' + CFG.H + ' ticks, so keep going toward ' + deg(mid) + '.';
+  }
+  return { chosen: best.action, cands, status, gap, mid, idleEnd: idle.end, short };
+}
+
+function command(prev, next) {
+  if (prev === next) {
+    return { label: next === 'AC' ? 'AC ON' : next === 'HEATER' ? 'HEATER ON' : 'IDLE', kind: next, changed: false, prev, next };
+  }
+  let label;
+  if (next === 'AC') label = 'AC ON';
+  else if (next === 'HEATER') label = 'HEATER ON';
+  else label = prev === 'AC' ? 'AC OFF' : 'HEATER OFF';
+  return { label, kind: next, changed: true, prev, next };
+}
+
+function agentTick(s) {
+  if (s.auto) {
+    s.autoLeft--;
+    if (s.autoLeft <= 0) { s.wx = nextWeather(s.wx); s.autoLeft = 26 + Math.floor(rand() * 13); }
+  }
+  s.tick++;
+  physics(s);
+  const p = { T: s.T, H: s.H, out: s.out, outH: s.outH, wx: s.wx, solar: WX[s.wx].solar, goal: { min: s.goal.min, max: s.goal.max }, device: s.device };
+  const d = deliberate(p);
+  const cmd = command(s.device, d.chosen);
+  s.device = d.chosen;
+  if (cmd.changed) s.since = s.tick;
+  return { tick: s.tick, min: s.clockMin, p, d, cmd };
+}
+// ===== CORE END =====
+
+// ===== UI =====
+const $ = id => document.getElementById(id);
+const fmtClock = m => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+const devName = d => d === 'AC' ? 'AC ON' : d === 'HEATER' ? 'HEATER ON' : 'IDLE';
+const devKind = d => d === 'AC' ? 'cool' : d === 'HEATER' ? 'heat' : 'idle';
+
+let S = newState();
+let hist = [], log = [], last = null;
+let logFilter = 'all', chartOut = false, hoverIdx = null, timer = null;
+const PREFILL = 72, NHIST = 300, NLOG = 500;
+
+function recordTick(r) {
+  hist.push({ tick: r.tick, min: r.min, T: r.p.T, H: r.p.H, out: r.p.out, wx: r.p.wx, dev: r.cmd.next, chg: r.cmd.changed, gmin: r.p.goal.min, gmax: r.p.goal.max });
+  log.push({ type: 'tick', tick: r.tick, min: r.min, p: r.p, d: r.d, cmd: r.cmd });
+  if (hist.length > NHIST) hist.shift();
+  if (log.length > NLOG) log.shift();
+  last = r;
+}
+function pushEvent(text) { log.push({ type: 'event', tick: S.tick, min: S.clockMin, text }); }
+
+function prefill() {
+  for (let i = 0; i < PREFILL; i++) recordTick(agentTick(S));
+}
+
+function runTick() { recordTick(agentTick(S)); renderAll(); }
+
+function startTimer() {
+  if (timer) clearInterval(timer);
+  timer = null;
+  if (S.running) timer = setInterval(runTick, 1000 / S.speed);
+}
+
+/* ---------- renderers ---------- */
+function setPressed(container, attr, value) {
+  container.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === String(value))));
+}
+const gpos = v => clamp((v - 12) / 26, 0, 1) * 100;
+
+function setChip(el, kind, text, extra) {
+  el.className = 'chip ' + kind + (extra ? ' ' + extra : '');
+  el.querySelector('span').textContent = text;
+}
+
+function renderRoom() {
+  const T = S.T, g = S.goal;
+  $('tTemp').textContent = f1(T);
+  $('sceneTemp').textContent = f1(T) + '°';
+  $('tHum').textContent = Math.round(S.H);
+  const status = T > g.max ? 'above' : T < g.min ? 'below' : 'inside';
+  setChip($('goalChip'), status === 'inside' ? 'ok' : 'bad', status === 'inside' ? 'In goal' : status === 'above' ? 'Above goal' : 'Below goal');
+
+  const prev = hist.length > 3 ? hist[hist.length - 4].T : T;
+  const rate = (T - prev) / 3;
+  $('tTrend').textContent = Math.abs(rate) < 0.03 ? 'steady' : (rate > 0 ? 'rising ' : 'falling ') + Math.abs(rate).toFixed(2) + '°C/tick';
+
+  const hv = S.H;
+  if (hv < 30) setChip($('humChip'), 'warn', 'Dry');
+  else if (hv > 60) setChip($('humChip'), 'warn', 'Humid');
+  else setChip($('humChip'), 'ok', 'Comfortable');
+
+  const dev = S.device;
+  setChip($('devChip'), devKind(dev), dev === 'IDLE' ? 'Idle' : devName(dev), 'lg');
+  const ticksIn = S.tick - S.since;
+  $('devSub').textContent = dev === 'IDLE' ? 'AC off · heater off · ' + ticksIn + ' ticks' : (dev === 'AC' ? 'Heater off · cooling' : 'AC off · heating') + ' for ' + ticksIn + ' ticks';
+
+  const scene = $('scene');
+  scene.dataset.wx = S.wx; scene.dataset.dev = dev;
+
+  $('gaugeNote').textContent = 'Goal ' + f1(g.min) + '–' + f1(g.max) + '°C';
+  $('gBand').style.left = gpos(g.min) + '%';
+  $('gBand').style.width = (gpos(g.max) - gpos(g.min)) + '%';
+  $('gMark').style.left = gpos(T) + '%';
+  $('gScale').innerHTML = '<span style="left:0;transform:none">12°</span><span style="left:' + gpos(g.min) + '%;color:var(--ok)">' + f1(g.min) + '</span><span style="left:' + gpos(g.max) + '%;color:var(--ok)">' + f1(g.max) + '</span><span style="left:100%;transform:translateX(-100%)">38°</span>';
+  $('gMinOut').textContent = f1(g.min) + '°C';
+  $('gMaxOut').textContent = f1(g.max) + '°C';
+}
+
+function renderSim() {
+  setPressed($('wxBtns'), 'wx', S.wx);
+  $('oTemp').textContent = f1(S.out);
+  $('oHum').textContent = Math.round(S.outH);
+  $('autoSw').setAttribute('aria-checked', String(S.auto));
+  $('autoNext').textContent = S.auto ? 'Next: ' + WX[nextWeather(S.wx)].label + ' in ' + Math.max(S.autoLeft, 0) + ' ticks' : 'Auto weather off';
+  $('runBtn').textContent = S.running ? 'Pause' : 'Run';
+  $('runBtn').className = 'btn primary';
+  setPressed($('speedBtns'), 'speed', S.speed);
+  setChip($('runChip'), S.running ? 'ok' : 'warn', S.running ? 'Agent running' : 'Agent paused');
+  $('clockChip').textContent = 'Tick ' + S.tick + ' · ' + fmtClock(S.clockMin);
+}
+
+function renderAgent() {
+  if (!last) return;
+  const { p, d, cmd } = last;
+  $('agentTick').textContent = 'Tick ' + last.tick + ' · ' + fmtClock(last.min);
+  const row = (k, v) => '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>';
+  $('perceive').innerHTML =
+    row('Indoor', deg(p.T)) + row('Humidity', Math.round(p.H) + '%') +
+    row('Outdoor', deg(p.out)) + row('Sky', WX[p.wx].label) +
+    row('Goal', f1(p.goal.min) + '–' + f1(p.goal.max) + '°C') + row('Device', p.device === 'IDLE' ? 'idle' : devName(p.device));
+  const names = { AC: 'Run AC', HEATER: 'Run heater', IDLE: 'Do nothing' };
+  $('cands').innerHTML = d.cands.map(c => {
+    const fit = c.miss > 0.005 ? f1(c.miss) + ' ' + c.side : 'inside';
+    return '<tr class="' + (c.action === d.chosen ? 'best' : '') + '"><td>' + names[c.action] + '</td><td>' + deg(c.end) + '</td><td>' + fit + '</td><td>' + c.cost.toFixed(2) + '</td></tr>';
+  }).join('');
+  setChip($('actChip'), devKind(cmd.next), cmd.label + (cmd.changed ? '' : (cmd.next === 'IDLE' ? '' : ' · hold')), 'lg' + (cmd.changed ? '' : ' hold'));
+  $('reason').textContent = d.short;
+}
+
+function renderChart() {
+  const box = $('chartBox');
+  const W = Math.max(300, Math.floor(box.clientWidth || 640));
+  const narrow = W < 520;
+  const H = narrow ? 270 : 320, N = narrow ? 36 : 60;
+  const m = { l: narrow ? 34 : 42, r: 14, t: 14, b: 58 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const data = hist.slice(-N);
+  if (!data.length) { $('chartSvg').innerHTML = ''; return; }
+  const g = S.goal;
+  const vals = [g.min, g.max].concat(data.map(d => d.T));
+  if (chartOut) data.forEach(d => vals.push(d.out));
+  let lo = Math.min.apply(null, vals) - 1.2, hi = Math.max.apply(null, vals) + 1.2;
+  if (hi - lo < 8) { const c = (hi + lo) / 2; lo = c - 4; hi = c + 4; }
+  const span = hi - lo, step = span <= 10 ? 1 : span <= 22 ? 2 : 5;
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const xs = i => m.l + ((i + (N - data.length)) / (N - 1)) * pw;
+  const ys = v => m.t + (1 - (v - lo) / (hi - lo)) * ph;
+  let s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Indoor temperature over the last ' + data.length + ' ticks against the goal range">';
+  s += '<defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".25"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>';
+  // grid + y labels
+  for (let v = lo; v <= hi + 1e-9; v += step) {
+    s += '<line x1="' + m.l + '" x2="' + (m.l + pw) + '" y1="' + ys(v) + '" y2="' + ys(v) + '" stroke="var(--line)" stroke-width="1" opacity=".7"/>';
+    s += '<text class="ax" x="' + (m.l - 7) + '" y="' + (ys(v) + 4) + '" text-anchor="end">' + v + '°</text>';
+  }
+  // goal band
+  s += '<rect x="' + m.l + '" y="' + ys(g.max) + '" width="' + pw + '" height="' + (ys(g.min) - ys(g.max)) + '" fill="var(--ok)" opacity=".14"/>';
+  s += '<line x1="' + m.l + '" x2="' + (m.l + pw) + '" y1="' + ys(g.max) + '" y2="' + ys(g.max) + '" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="5 4"/>';
+  s += '<line x1="' + m.l + '" x2="' + (m.l + pw) + '" y1="' + ys(g.min) + '" y2="' + ys(g.min) + '" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="5 4"/>';
+  s += '<text class="axl" x="' + (m.l + 6) + '" y="' + (ys(g.max) - 5) + '">ceiling ' + f1(g.max) + '°</text>';
+  s += '<text class="axl" x="' + (m.l + 6) + '" y="' + (ys(g.min) + 14) + '">floor ' + f1(g.min) + '°</text>';
+  // outdoor
+  if (chartOut) {
+    s += '<polyline fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-dasharray="4 4" points="' + data.map((d, i) => xs(i).toFixed(1) + ',' + ys(d.out).toFixed(1)).join(' ') + '"/>';
+  }
+  // indoor area + line
+  const pts = data.map((d, i) => xs(i).toFixed(1) + ',' + ys(d.T).toFixed(1));
+  s += '<polygon fill="url(#areaGrad)" points="' + xs(0).toFixed(1) + ',' + ys(lo) + ' ' + pts.join(' ') + ' ' + xs(data.length - 1).toFixed(1) + ',' + ys(lo) + '"/>';
+  s += '<polyline fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="' + pts.join(' ') + '"/>';
+  const li = data.length - 1;
+  s += '<circle cx="' + xs(li) + '" cy="' + ys(data[li].T) + '" r="4.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
+  s += '<text class="ax" style="fill:var(--fg);font-weight:600" x="' + (xs(li) - 9) + '" y="' + (ys(data[li].T) - 9) + '" text-anchor="end">' + f1(data[li].T) + '°</text>';
+  // actuator strip
+  const sy = m.t + ph + 12, bw = pw / (N - 1);
+  s += '<rect x="' + m.l + '" y="' + sy + '" width="' + pw + '" height="12" rx="3" fill="var(--surface-2)"/>';
+  data.forEach((d, i) => {
+    if (d.dev === 'IDLE') return;
+    const x0 = Math.max(m.l, xs(i) - bw / 2), x1 = Math.min(m.l + pw, xs(i) + bw / 2);
+    s += '<rect x="' + x0.toFixed(1) + '" y="' + sy + '" width="' + (x1 - x0 + 0.5).toFixed(1) + '" height="12" fill="' + (d.dev === 'AC' ? 'var(--cool)' : 'var(--heat)') + '"/>';
+  });
+  s += '<text class="ax" x="' + (m.l - 7) + '" y="' + (sy + 10) + '" text-anchor="end">dev</text>';
+  // x labels
+  const every = Math.round(N / 6);
+  for (let i = data.length - 1; i >= 0; i -= every) {
+    s += '<text class="ax" x="' + xs(i) + '" y="' + (sy + 32) + '" text-anchor="' + (i === data.length - 1 ? 'end' : 'middle') + '">' + fmtClock(data[i].min) + '</text>';
+  }
+  // hover
+  const tip = $('tip');
+  if (hoverIdx !== null) {
+    const hi2 = clamp(hoverIdx, 0, data.length - 1), d = data[hi2];
+    s += '<line x1="' + xs(hi2) + '" x2="' + xs(hi2) + '" y1="' + m.t + '" y2="' + (sy + 12) + '" stroke="var(--fg)" stroke-width="1" opacity=".5"/>';
+    s += '<circle cx="' + xs(hi2) + '" cy="' + ys(d.T) + '" r="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"/>';
+    tip.hidden = false;
+    tip.style.left = clamp(xs(hi2), 100, W - 100) + 'px';
+    tip.innerHTML = '<b>' + fmtClock(d.min) + '</b> · tick ' + d.tick + '<br>Indoor ' + deg(d.T) + ' · ' + Math.round(d.H) + '% RH<br>Outdoor ' + deg(d.out) + ' ' + WX[d.wx].label + '<br>Device ' + devName(d.dev);
+  } else tip.hidden = true;
+  s += '</svg>';
+  $('chartSvg').innerHTML = s;
+  chartGeom = { m, pw, N, len: data.length };
+
+  const inGoal = data.filter(d => d.T >= d.gmin && d.T <= d.gmax).length;
+  const sw = data.filter(d => d.chg).length;
+  $('chartStats').textContent = 'Last ' + data.length + ' ticks: ' + Math.round(inGoal / data.length * 100) + '% inside the goal range, ' + sw + ' device switches';
+}
+let chartGeom = null;
+
+function actChip(c) {
+  return '<span class="chip ' + devKind(c.next) + (c.changed ? '' : ' hold') + '"><i></i>' + c.label + (c.changed || c.next === 'IDLE' ? '' : ' · hold') + '</span>';
+}
+
+function renderLog() {
+  const rows = []; let shown = 0, ticks = 0, changes = 0;
+  log.forEach(e => { if (e.type === 'tick') { ticks++; if (e.cmd.changed) changes++; } });
+  for (let i = log.length - 1; i >= 0 && shown < 60; i--) {
+    const e = log[i];
+    if (e.type === 'event') {
+      rows.push('<tr class="ev"><td class="m">' + e.tick + '</td><td class="m">' + fmtClock(e.min) + '</td><td colspan="3">' + e.text + '</td></tr>');
+      shown++; continue;
+    }
+    if (logFilter === 'changes' && !e.cmd.changed) continue;
+    const p = e.p;
+    rows.push('<tr class="' + (e.cmd.changed ? 'chg' : '') + '"><td class="m">' + e.tick + '</td><td class="m">' + fmtClock(e.min) + '</td>' +
+      '<td class="m">' + f1(p.T) + '°C · ' + Math.round(p.H) + '% RH<br><span class="px">out ' + f1(p.out) + '°C ' + WX[p.wx].label + '<br>goal ' + f1(p.goal.min) + '–' + f1(p.goal.max) + '°C</span></td>' +
+      '<td>' + e.d.short + '</td><td>' + actChip(e.cmd) + '</td></tr>');
+    shown++;
+  }
+  $('logBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="px" style="padding:20px 12px">No entries yet. Press Step or Run to start the agent loop.</td></tr>';
+  $('logCount').textContent = ticks + ' decisions logged, ' + changes + ' actuator changes. Showing the newest ' + Math.min(shown, 60) + ' rows.';
+}
+
+function renderAll() { renderRoom(); renderSim(); renderAgent(); renderChart(); renderLog(); }
+
+/* ---------- events ---------- */
+function setWeather(key, source) {
+  if (S.wx === key && source === 'manual') { S.auto = false; renderSim(); return; }
+  S.wx = key;
+  if (source === 'manual') { S.auto = false; pushEvent('Weather set to ' + WX[key].label + ' by you. Automatic weather is off.'); }
+  renderAll();
+}
+$('wxBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setWeather(b.dataset.wx, 'manual'); });
+$('autoSw').addEventListener('click', () => {
+  S.auto = !S.auto;
+  if (S.auto) { S.autoLeft = 26 + Math.floor(rand() * 13); pushEvent('Automatic weather turned on.'); }
+  else pushEvent('Automatic weather turned off.');
+  renderAll();
+});
+$('runBtn').addEventListener('click', () => { S.running = !S.running; startTimer(); renderSim(); });
+$('stepBtn').addEventListener('click', () => { runTick(); });
+$('resetBtn').addEventListener('click', () => { S = newState(); hist = []; log = []; last = null; hoverIdx = null; prefill(); startTimer(); renderAll(); });
+$('speedBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.speed = +b.dataset.speed; startTimer(); renderSim(); });
+$('logFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; logFilter = b.dataset.f; setPressed($('logFilter'), 'f', logFilter); renderLog(); });
+$('clearLog').addEventListener('click', () => { log = []; renderLog(); });
+$('outToggle').addEventListener('change', e => { chartOut = e.target.checked; renderChart(); });
+
+$('gMin').addEventListener('input', e => { const v = Math.min(+e.target.value, S.goal.max - 2); e.target.value = v; S.goal.min = v; renderRoom(); renderChart(); });
+$('gMax').addEventListener('input', e => { const v = Math.max(+e.target.value, S.goal.min + 2); e.target.value = v; S.goal.max = v; renderRoom(); renderChart(); });
+const goalChanged = () => { pushEvent('Goal range changed to ' + f1(S.goal.min) + '–' + f1(S.goal.max) + '°C. The agent plans against it from the next tick.'); renderLog(); };
+$('gMin').addEventListener('change', goalChanged);
+$('gMax').addEventListener('change', goalChanged);
+
+$('chartBox').addEventListener('pointermove', e => {
+  if (!chartGeom) return;
+  const r = $('chartBox').getBoundingClientRect();
+  const x = e.clientX - r.left, gm = chartGeom;
+  hoverIdx = Math.round(((x - gm.m.l) / gm.pw) * (gm.N - 1)) - (gm.N - gm.len);
+  if (hoverIdx < 0 || hoverIdx > gm.len - 1) hoverIdx = null;
+  renderChart();
+});
+$('chartBox').addEventListener('pointerleave', () => { hoverIdx = null; renderChart(); });
+if (window.ResizeObserver) new ResizeObserver(() => renderChart()).observe($('chartBox'));
+
+/* ---------- boot ---------- */
+prefill();
+renderAll();
+startTimer();
+</script>
+
+</body></html>
